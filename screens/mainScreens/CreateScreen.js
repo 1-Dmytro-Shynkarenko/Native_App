@@ -1,42 +1,79 @@
 import { useState, useEffect } from "react";
-import { MaterialIcons } from "@expo/vector-icons";
+import {
+  MaterialIcons,
+  Foundation,
+  FontAwesome,
+  Ionicons,
+} from "@expo/vector-icons";
+import { Camera, CameraType, FlashMode } from "expo-camera";
+import { useIsFocused } from "@react-navigation/native";
+import * as Location from "expo-location";
+import Spinner from "react-native-loading-spinner-overlay";
 import {
   Text,
   View,
   StyleSheet,
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
-  Image,
   Dimensions,
   TouchableOpacity,
   TextInput,
   Keyboard,
   Platform,
+  Button,
+  ScrollView,
+  ImageBackground,
 } from "react-native";
+import { v4 as uuidv4 } from "uuid";
 
 //stateSchema
 const initialState = {
-  photo: "",
-  name: "",
-  location: "",
+  title: "",
+  location: null,
+  region: {},
 };
 
-//icons
-const camera = require("../../assets/icon/camera.png");
-
 export default function CreateScreen({ navigation }) {
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  //location
+  const [permission, requestPermission] = Camera.useCameraPermissions();
+
+  //camera
+  const [camera, setCamera] = useState(null);
+  const [photo, setPhoto] = useState(null);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const isFocused = useIsFocused();
+  const [cameraType, setCameraType] = useState(CameraType.back);
+  const [flashMode, setFlashMode] = useState(FlashMode.on);
+
+  //other
+  const [loading, setLoading] = useState(false);
   const [post, setPost] = useState(initialState);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [dimensions, setdimensions] = useState(
     Dimensions.get("window").width - 16 * 2
   );
+  const id = uuidv4();
+  const redyToPost = photo && post.title;
+  const redyToDell = photo || post.title;
 
   useEffect(() => {
-    const onChange = () => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setErrorMsg("Permission to access location was denied");
+        return;
+      }
+    })();
+    requestPermission;
+    const onChangeDimension = () => {
       const width = Dimensions.get("window").width - 20 * 2;
       setdimensions(width);
     };
-    const dimensionsHandler = Dimensions.addEventListener("change", onChange);
+
+    const dimensionsHandler = Dimensions.addEventListener(
+      "change",
+      onChangeDimension
+    );
 
     const keyboardDidShowListener = Keyboard.addListener(
       "keyboardDidShow",
@@ -57,84 +94,254 @@ export default function CreateScreen({ navigation }) {
       keyboardDidHideListener.remove();
       keyboardDidShowListener.remove();
     };
-  }, []);
+  }, [photo, loading, post, cameraType]);
 
   const keyboardHide = () => {
     setKeyboardVisible(false);
     Keyboard.dismiss();
-    console.log(post);
-    setPost(initialState);
+  };
+
+  const onCameraReady = () => {
+    setIsCameraReady(true);
+  };
+
+  const takePicture = async () => {
+    const makePhoto = async () => {
+      let { uri } = await camera.takePictureAsync();
+      setPhoto(uri);
+    };
+
+    const takeLocation = async () => {
+      let location = await Location.getCurrentPositionAsync({});
+      setPost((prevState) => ({ ...prevState, location: location.coords }));
+      const regionData = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      setPost((prevState) => ({ ...prevState, region: regionData[0] }));
+      setLoading(false);
+    };
+
+    try {
+      setLoading(true);
+      makePhoto();
+      takeLocation();
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   const submitForm = () => {
-    keyboardHide();
-    navigation.navigate("PostsScreen", post);
+    navigation.navigate("DefaultPostsScreen", {
+      id,
+      image: photo,
+      title: post.title,
+      comments: 3,
+      location: ` ${post.region.country}, ${post.region.city}`,
+      region: post.location,
+      like: 0,
+    });
+
+    setPhoto(null);
+    setPost(initialState);
   };
+
+  const onDell = () => {
+    setPhoto(null);
+    setPost(initialState);
+    navigation.navigate("DefaultPostsScreen");
+  };
+
+  if (!permission) {
+    // Camera permissions are still loading
+    return null;
+  }
+
+  if (!permission.granted) {
+    // Camera permissions are not granted yet
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={{ textAlign: "center" }}>
+          We need your permission to show the camera
+        </Text>
+        <Button onPress={requestPermission} title="grant permission" />
+      </View>
+    );
+  }
+
   return (
     <TouchableWithoutFeedback onPress={keyboardHide}>
       <View style={{ ...styles.container, width: dimensions + 16 * 2 }}>
-        <TouchableOpacity activeOpacity={0.6} style={{ marginBottom: 8 }}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Spinner
+            //visibility of Overlay Loading Spinner
+            size="large"
+            color="orange"
+            visible={loading}
+            //Text with the Spinner
+            textContent={"Loading..."}
+            //Text style of the Spinner Text
+            textStyle={styles.spinnerTextStyle}
+          />
+          <View style={{ marginBottom: 8, fontSize: 22 }}>
+            {!isKeyboardVisible && (
+              <>
+                {isFocused && (
+                  <>
+                    {!photo ? (
+                      <Camera
+                        skipProcessing={true}
+                        flashMode={flashMode}
+                        type={cameraType}
+                        onCameraReady={onCameraReady}
+                        onMountError={(error) => {
+                          154;
+                          console.log("cammera error", error);
+                          155;
+                        }}
+                        ratio="1:1"
+                        ref={setCamera}
+                        style={styles.camera}
+                      >
+                        <TouchableOpacity
+                          activeOpacity={0.6}
+                          style={styles.takePhotoBtn}
+                          onPress={takePicture}
+                        >
+                          <FontAwesome name="camera" size={20} color="grey" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.6}
+                          style={styles.changeCameraBtn}
+                          onPress={() =>
+                            setCameraType(
+                              cameraType === CameraType.front
+                                ? CameraType.back
+                                : CameraType.front
+                            )
+                          }
+                        >
+                          <Foundation name="refresh" size={24} color="white" />
+                        </TouchableOpacity>
+                        {cameraType === CameraType.back && (
+                          <TouchableOpacity
+                            activeOpacity={0.6}
+                            style={styles.flashBtn}
+                            onPress={() => {
+                              setFlashMode(
+                                flashMode === FlashMode.on
+                                  ? FlashMode.off
+                                  : FlashMode.on
+                              );
+                            }}
+                          >
+                            <Ionicons
+                              name="flash"
+                              size={24}
+                              color={
+                                flashMode === FlashMode.on ? "blue" : "white"
+                              }
+                            />
+                          </TouchableOpacity>
+                        )}
+                      </Camera>
+                    ) : (
+                      <View style={{ position: "relative" }}>
+                        <ImageBackground
+                          source={{ uri: photo }}
+                          style={styles.imageView}
+                        >
+                          <TouchableOpacity
+                            activeOpacity={0.6}
+                            style={styles.dellPhotoBtn}
+                            onPress={() => {
+                              setPhoto(null);
+                              setPost(initialState);
+                            }}
+                          >
+                            <Foundation name="trash" size={20} color="grey" />
+                          </TouchableOpacity>
+                        </ImageBackground>
+                      </View>
+                    )}
+                  </>
+                )}
+                <View>
+                  <Text style={styles.addTitile}>
+                    {photo ? "Удалить фото" : "Сделать фото"}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : ""}
+          >
+            <View
+              style={{
+                paddingBottom: isKeyboardVisible ? 10 : 0,
+              }}
+            >
+              <View style={{ marginBottom: 16 }}>
+                <TextInput
+                  placeholder="Название..."
+                  value={post.title}
+                  style={styles.input}
+                  textAlign={"left"}
+                  onFocus={() => setKeyboardVisible(true)}
+                  onChangeText={(value) =>
+                    setPost((prevState) => ({ ...prevState, title: value }))
+                  }
+                />
+              </View>
+              <View style={{ marginBottom: 32, position: "relative" }}>
+                {post.region.country !== undefined && (
+                  <Text>
+                    {post.region.country + ","} {post.region.city}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+
           {!isKeyboardVisible && (
             <>
-              <View style={styles.addImage}>
-                <Image source={camera} style={styles.cameraIcon} />
-              </View>
-              <View>
-                <Text style={styles.addTitile}>Загрузите фото</Text>
-              </View>
+              <TouchableOpacity
+                disabled={redyToPost ? false : true}
+                activeOpacity={0.6}
+                style={{
+                  ...styles.subBtn,
+                  backgroundColor: redyToPost ? "#FF6C00" : "#F6F6F6",
+                }}
+                onPress={() => submitForm()}
+              >
+                <Text
+                  style={{
+                    ...styles.btnTitle,
+                    color: redyToPost ? "#FFFFFF" : "#BDBDBD",
+                  }}
+                >
+                  Опубликовать
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={redyToDell ? false : true}
+                activeOpacity={0.6}
+                style={{
+                  ...styles.dellBtn,
+                  backgroundColor: redyToDell ? "#FF6C00" : "#F6F6F6",
+                }}
+                onPress={() => onDell()}
+              >
+                <MaterialIcons
+                  name="delete-outline"
+                  size={24}
+                  color={redyToDell ? "#FFFFFF" : "#DADADA"}
+                />
+              </TouchableOpacity>
             </>
           )}
-        </TouchableOpacity>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : ""}>
-          <View
-            style={{
-              ...styles.form,
-              paddingBottom: isKeyboardVisible ? 10 : 0,
-            }}
-          >
-            <View style={{ marginBottom: 16 }}>
-              <TextInput
-                placeholder="Название..."
-                value={post.name}
-                style={styles.input}
-                textAlign={"left"}
-                onFocus={() => setKeyboardVisible(true)}
-                onChangeText={(value) =>
-                  setPost((prevState) => ({ ...prevState, name: value }))
-                }
-              />
-            </View>
-            <View style={{ marginBottom: 32, position: "relative" }}>
-              <TextInput
-                placeholder="Местность..."
-                value={post.location}
-                style={styles.input}
-                textAlign={"left"}
-                onFocus={() => setKeyboardVisible(true)}
-                onChangeText={(value) =>
-                  setPost((prevState) => ({ ...prevState, location: value }))
-                }
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-        <TouchableOpacity
-          activeOpacity={0.6}
-          style={styles.subBtn}
-          onPress={() => submitForm()}
-        >
-          <Text style={styles.btnTitle}>Опубликовать</Text>
-        </TouchableOpacity>
-
-        {!isKeyboardVisible && (
-          <TouchableOpacity
-            activeOpacity={0.6}
-            style={styles.dellBtn}
-            onPress={() => submitForm()}
-          >
-            <MaterialIcons name="delete-outline" size={24} color="#DADADA" />
-          </TouchableOpacity>
-        )}
+        </ScrollView>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -149,18 +356,51 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     backgroundColor: "#FFFFFF",
   },
-  addImage: {
-    position: "relative",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  camera: {
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#E8E8E8",
-    height: 240,
+    height: 340,
   },
-  cameraIcon: {},
+  takePhotoBtn: {
+    opacity: 0.5,
+    borderRadius: 50,
+    backgroundColor: "#FFFFFF",
+    width: 70,
+    height: 70,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  changeCameraBtn: {
+    padding: 3,
+    opacity: 0.6,
+    position: "absolute",
+    right: 7,
+    top: 7,
+  },
+  flashBtn: {
+    padding: 3,
+    opacity: 0.6,
+    position: "absolute",
+    left: 7,
+    top: 7,
+  },
+  imageView: {
+    height: 340,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dellPhotoBtn: {
+    opacity: 0.5,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 70,
+    height: 70,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "white",
+    borderRadius: 50,
+  },
   addTitile: {
     fontSize: 14,
     lineHeight: 19,
@@ -169,7 +409,6 @@ const styles = StyleSheet.create({
     fontFamily: "Roboto-Regular",
     marginBottom: 30,
   },
-  form: {},
   input: {
     paddingBottom: 16,
     paddingTop: 16,
@@ -225,15 +464,16 @@ const styles = StyleSheet.create({
   },
   dellBtn: {
     marginTop: "auto",
-    marginBottom: 10,
     padding: 12,
     width: 70,
     height: 50,
     marginRight: "auto",
     marginLeft: "auto",
     alignItems: "center",
-
     backgroundColor: "#F6F6F6",
     borderRadius: 20,
+  },
+  spinnerTextStyle: {
+    color: "orange",
   },
 });
