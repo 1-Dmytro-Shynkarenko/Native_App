@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
 import {
   ImageBackground,
   StyleSheet,
@@ -14,7 +15,7 @@ import {
   Dimensions,
 } from "react-native";
 
-// import useRoute from "../../router";
+import { authSignInUser } from "../../redux/auth/authOperation";
 
 //stateSchema
 const initialState = {
@@ -26,6 +27,7 @@ const initialState = {
 const imageBG = require("../../assets/images/screenBg.jpg");
 
 export default function LoginScreen({ navigation }) {
+  const dispatch = useDispatch();
   const [showPass, setShowPass] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [state, setState] = useState(initialState);
@@ -61,15 +63,14 @@ export default function LoginScreen({ navigation }) {
     };
   }, []);
 
-  const submitForm = () => {
+  const submitForm = async () => {
     keyboardHide();
-    navigation.navigate("Home", state);
+    dispatch(authSignInUser(state));
   };
 
   const keyboardHide = () => {
     setKeyboardVisible(false);
     Keyboard.dismiss();
-    // setState(initialState);
   };
 
   const toglePass = () => {
@@ -91,12 +92,12 @@ export default function LoginScreen({ navigation }) {
               }}
             >
               <View style={styles.header}>
-                <Text style={styles.headerTitle}>Войти</Text>
+                <Text style={styles.headerTitle}>Вхід</Text>
               </View>
 
               <View style={{ marginBottom: 16 }}>
                 <TextInput
-                  placeholder="Адрес электронной почты"
+                  placeholder="Адреса електроної пошти"
                   value={state.email}
                   style={styles.input}
                   textAlign={"left"}
@@ -110,7 +111,7 @@ export default function LoginScreen({ navigation }) {
                 <View style={styles.showPassThmb}>
                   <TouchableOpacity activeOpacity={0.6} onPress={toglePass}>
                     <Text style={styles.showPass}>
-                      {!showPass ? "Показать" : "Скрыть"}
+                      {!showPass ? "Показати" : "Скрити"}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -131,14 +132,14 @@ export default function LoginScreen({ navigation }) {
                 style={styles.btn}
                 onPress={() => submitForm()}
               >
-                <Text style={styles.btnTitle}>Войти</Text>
+                <Text style={styles.btnTitle}>Вхід</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.6}
                 onPress={() => navigation.navigate({ name: "Registration" })}
               >
                 <Text style={styles.regTitle}>
-                  Нет аккаунта? Зарегистрироваться
+                  Немає акаунта? Реєстрація
                 </Text>
               </TouchableOpacity>
             </View>

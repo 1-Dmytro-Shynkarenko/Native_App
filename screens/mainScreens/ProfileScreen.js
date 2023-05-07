@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import {
   Text,
   View,
@@ -11,26 +12,55 @@ import {
   ScrollView,
 } from "react-native";
 
-//components
-import ProfilePost from "../../components/ProfilePost/ProfilePost";
+import { fsbase } from "../../firebase/config";
+import { collection, onSnapshot, where, query } from "firebase/firestore";
 
-//data
-import posts from "../../assets/data/posts.js";
+import { authSignOutUser } from "../../redux/auth/authOperation";
+
+//components
+import Post from "../../components/Post/Post";
 
 //images
-const avatar = require("../../assets/images/avatar.png");
+
 const imageBG = require("../../assets/images/screenBg.jpg");
-const image = require("../../assets/images/postImg1.png");
+const avaLOgo = require("../../assets/images/avatarLogo.png");
 
 //icons
 const LogOutIcon = require("../../assets/icon/log-out.png");
 
 export default function ProfileScreen({ navigation }) {
+  const { login, email, avatarImage, userId } = useSelector(
+    (state) => state.auth
+  );
+  const [posts, setPosts] = useState([]);
+
+  const dispatch = useDispatch();
   const [dimensions, setdimensions] = useState(
     Dimensions.get("window").width - 16 * 2
   );
 
+  const handlePosts = async () => {
+    try {
+      onSnapshot(
+        query(collection(fsbase, "posts"), where("userId", "==", userId)),
+        (docSnap) => {
+          const currentPosts = docSnap.docs.map((doc) => ({
+            ...doc.data(),
+            id: doc.id,
+          }));
+          const sortedPosts = currentPosts.sort(
+            (a, b) => a.created < b.created
+          );
+          setPosts(sortedPosts);
+        }
+      );
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   useEffect(() => {
+    handlePosts();
     const onChange = () => {
       const width = Dimensions.get("window").width - 16 * 2;
       setdimensions(width);
@@ -42,23 +72,29 @@ export default function ProfileScreen({ navigation }) {
     };
   }, []);
 
+  const userHasAvatar = avatarImage !== undefined && avatarImage !== null;
+
   return (
     <ImageBackground source={imageBG} style={styles.image}>
       <View style={styles.container}>
         <TouchableOpacity
           activeOpacity={0.6}
           style={{ position: "absolute", top: 22, right: 16 }}
-          onPress={() => navigation.navigate("Login")}
+          onPress={() => dispatch(authSignOutUser())}
         >
           <Image source={LogOutIcon} style={{}} />
         </TouchableOpacity>
         <View style={{ position: "absolute", top: -60 }}>
           <View>
             <Image
-              source={avatar}
+              source={
+                userHasAvatar
+                  ? { uri: avatarImage, height: 120, width: 120 }
+                  : avaLOgo
+              }
               style={{
-                width: 120,
                 height: 120,
+                width: 120,
                 objectFit: "cover",
                 borderRadius: 16,
               }}
@@ -97,45 +133,42 @@ export default function ProfileScreen({ navigation }) {
               fontFamily: "Roboto-Bold",
             }}
           >
-            Natali Romanova
+            {email}
           </Text>
         </View>
-        {/* <FlatList
-          style={{ width: dimensions }}
-          data={posts}
-          showsVerticalScrollIndicator={false}
-          keyExtractor={(item, indx) => indx.toString()}
-          renderItem={({ item }) => {
-            const { id, image, title, comments, location, like } = item;
-            return (
-              <ProfilePost
-                navigation={navigation}
-                key={id}
-                title={title}
-                image={image}
-                comments={comments}
-                location={location}
-                like={like}
-              />
-            );
-          }}
-        /> */}
         <ScrollView
           showsVerticalScrollIndicator={false}
           style={{ width: dimensions }}
         >
           {posts &&
-            posts.map(({ id, image, title, comments, location, like }) => (
-              <ProfilePost
-                navigation={navigation}
-                key={id}
-                title={title}
-                image={image}
-                comments={comments}
-                location={location}
-                like={like}
-              />
-            ))}
+            posts.map(
+              ({
+                id,
+                photo,
+                title,
+                comments,
+                country,
+                city,
+                latitude,
+                longitude,
+                login,
+                avatarImage,
+              }) => (
+                <Post
+                  navigation={navigation}
+                  avatarImage={avatarImage}
+                  login={login}
+                  key={id}
+                  title={title}
+                  image={photo}
+                  comments={comments}
+                  city={city}
+                  country={country}
+                  latitude={latitude}
+                  longitude={longitude}
+                />
+              )
+            )}
         </ScrollView>
       </View>
     </ImageBackground>

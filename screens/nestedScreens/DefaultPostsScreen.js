@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import {
   Text,
   View,
@@ -8,28 +9,26 @@ import {
   FlatList,
 } from "react-native";
 
-const profile = {
-  name: "Nataliaa Romanova",
-  email: "email@example.com",
-};
+import { collection, onSnapshot, addDoc, doc } from "firebase/firestore";
+import { fsbase } from "../../firebase/config";
 
 //components
 import Post from "../../components/Post/Post";
 
 //images
-const ava = require("../../assets/images/avatar.png");
+const avaLOgo = require("../../assets/images/avatarLogo.png");
 
 export default function DefaultPostsScreen({ navigation, route }) {
+  const { login, email, avatarImage } = useSelector((state) => state.auth);
+
   const [posts, setPosts] = useState([]);
+  const [numberOfComments, setnumberOfComments] = useState(null);
   const [dimensions, setdimensions] = useState(
     Dimensions.get("window").width - 16 * 2
   );
 
-  const { name, email } = profile;
   useEffect(() => {
-    if (route.params) {
-      setPosts((prevState) => [...prevState, route.params]);
-    }
+    fetchPosts();
     const onChange = () => {
       const width = Dimensions.get("window").width - 16 * 2;
 
@@ -40,33 +39,89 @@ export default function DefaultPostsScreen({ navigation, route }) {
     return () => {
       dimensionsHandler.remove();
     };
-  }, [route.params]);
+  }, []);
 
+  const fetchPosts = async () => {
+    onSnapshot(collection(fsbase, "posts"), (docSnap) => {
+      const currentPosts = docSnap.docs.map((doc) => {
+        return { ...doc.data(), id: doc.id };
+      });
+      const sortedPosts = currentPosts.sort((a, b) => a.created < b.created);
+
+      setPosts(sortedPosts);
+    });
+  };
+
+  const countComments = async (postId) => {
+    const dbRef = doc(fsbase, "posts", postId);
+    onSnapshot(collection(dbRef, "comments"), (docSnap) => {
+      const currentComments = docSnap.docs.map((doc) => ({ ...doc.data() }));
+      console.log(`docSnap.docs.length`, docSnap.docs.length);
+    });
+  };
+
+  // const fetchNumbersOfComments = async (postId) => {
+  //   let result = null;
+  //   const dbRef = doc(fsbase, "posts", postId);
+  //   onSnapshot(
+  //     collection(dbRef, "comments"),
+  //     (docSnap) => (result = docSnap.docs.length)
+  //   );
+  //   return result;
+  // };
+
+  const keyExtractor = (item) => item?.id;
+  const userHasAvatar = avatarImage !== undefined && avatarImage !== null;
   return (
     <View style={{ ...styles.container, width: dimensions + 16 * 2 }}>
       <View style={styles.userThmb}>
-        <Image style={styles.avatar} source={ava} />
+        <Image
+          style={styles.avatar}
+          source={
+            userHasAvatar
+              ? { uri: avatarImage, height: 60, width: 60 }
+              : avaLOgo
+          }
+        />
         <View style={{ justifyContent: "center" }}>
-          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.name}>{login}</Text>
           <Text style={styles.email}>{email}</Text>
         </View>
       </View>
-      {posts && (
+      {posts.length > 0 && (
         <FlatList
           data={posts}
+          // initialNumToRender={4}
           showsVerticalScrollIndicator={false}
-          keyExtractor={(item, indx) => indx.toString()}
+          // keyExtractor={(item, indx) => indx.toString()}
+          keyExtractor={keyExtractor}
           renderItem={({ item }) => {
-            const { id, image, title, comments, location, region } = item;
+            const {
+              id,
+              photo,
+              title,
+              country,
+              city,
+              latitude,
+              comments,
+              longitude,
+              avatarImage,
+              login,
+            } = item;
+
             return (
               <Post
                 navigation={navigation}
-                key={id}
                 title={title}
-                image={image}
+                image={photo}
                 comments={comments}
-                location={location}
-                region={region}
+                city={city}
+                country={country}
+                latitude={latitude}
+                longitude={longitude}
+                postId={id}
+                avatarImage={avatarImage}
+                login={login}
               />
             );
           }}

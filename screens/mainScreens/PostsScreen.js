@@ -25,7 +25,7 @@ export default function PostScreen({ navigation }) {
       <NestedScreen.Screen
         name="CommentsScreen"
         options={{
-          title: "Комментарии",
+          title: "Коментарі",
           headerTitleAlign: "center",
           // headerShown: false,
           headerLeft: () => (

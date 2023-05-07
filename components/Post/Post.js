@@ -1,19 +1,30 @@
-import React from "react";
+import React, { memo } from "react";
+
 import { StyleSheet, Image, Text, View, TouchableOpacity } from "react-native";
 import { FontAwesome5, Feather } from "@expo/vector-icons";
+import ProfileDetails from "../ProfileDetails/ProfileDetails";
 
-const mapPin = require("../../assets/icon/map-pin.png");
-
-export default function Post({
+function Post({
   navigation,
   title,
   image,
   comments,
-  location,
-  region,
+  longitude,
+  latitude,
+  country: postCountry,
+  city,
+  postId,
+  avatarImage: postAvatarImage,
+  login: postLogin,
 }) {
   return (
     <View style={styles.post}>
+      <ProfileDetails
+        image={image}
+        postCountry={postCountry}
+        postAvatarImage={postAvatarImage}
+        postLogin={postLogin}
+      />
       <Image
         source={{ uri: image, height: 300, width: "100%" }}
         style={styles.postImg}
@@ -23,10 +34,17 @@ export default function Post({
       <View style={styles.postFooter}>
         <TouchableOpacity
           activeOpacity={0.6}
-          onPress={() => navigation.navigate("CommentsScreen", { image })}
+          onPress={() =>
+            navigation.navigate("CommentsScreen", {
+              image,
+              postId,
+              postCountry,
+              postAvatarImage,
+              postLogin,
+            })
+          }
         >
           <View style={styles.postCommentThmb}>
-            {/* <Image style={styles.postCommentIcon} source={commentPin} /> */}
             <FontAwesome5
               style={styles.postCommentIcon}
               name="comment"
@@ -37,24 +55,32 @@ export default function Post({
             <Text style={styles.postCommentNumber}>{comments}</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.6}
-          onPress={() => navigation.navigate("MapScreen", region)}
-        >
-          <View style={styles.postLocationThmb}>
-            <Feather
-              name="map-pin"
-              style={styles.postLocationIcon}
-              size={18}
-              color="black"
-            />
-            <Text style={styles.postLocationTitle}>{location}</Text>
-          </View>
-        </TouchableOpacity>
+        {latitude && longitude && (
+          <TouchableOpacity
+            activeOpacity={0.6}
+            onPress={() =>
+              navigation.navigate("MapScreen", { latitude, longitude })
+            }
+          >
+            <View style={styles.postLocationThmb}>
+              <Feather
+                name="map-pin"
+                style={styles.postLocationIcon}
+                size={18}
+                color="orange"
+              />
+              <Text style={styles.postLocationTitle}>
+                {postCountry}, {city}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
 }
+
+export default memo(Post);
 
 const styles = StyleSheet.create({
   post: {
@@ -104,5 +130,6 @@ const styles = StyleSheet.create({
     color: "#212121",
     fontFamily: "Roboto-Regular",
     textDecoration: "underlin",
+    color: "grey",
   },
 });

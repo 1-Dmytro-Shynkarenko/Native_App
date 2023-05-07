@@ -1,4 +1,10 @@
 import { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
+import * as ImagePicker from "expo-image-picker";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import "react-native-get-random-values";
+import { v4 as uuidv4 } from "uuid";
+import { app } from "../../firebase/config";
 import {
   ImageBackground,
   StyleSheet,
@@ -13,23 +19,29 @@ import {
   Dimensions,
 } from "react-native";
 
+import { authSignUpUser } from "../../redux/auth/authOperation";
+
 //stateSchema
 const initialState = {
+  login: "",
   email: "",
   password: "",
-  login: "",
+  avatarImage: null,
 };
 
 //images
 const image = require("../../assets/images/screenBg.jpg");
+const avaLOgo = require("../../assets/images/avatarLogo.png");
 
 export default function RegistrationScreen({ navigation }) {
+  const [state, setState] = useState(initialState);
   const [showPass, setShowPass] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  const [state, setState] = useState(initialState);
   const [dimensions, setdimensions] = useState(
     Dimensions.get("window").width - 20 * 2
   );
+
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const onChange = () => {
@@ -56,18 +68,75 @@ export default function RegistrationScreen({ navigation }) {
       keyboardDidHideListener.remove();
       keyboardDidShowListener.remove();
     };
-  }, []);
+  }, [state]);
 
-  const submitForm = () => {
-    keyboardHide();
-    navigation.navigate("Home", state);
+  const imageHander = async () => {
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        setState((prevstate) => ({
+          ...prevstate,
+          avatarImage: result.assets[0].uri,
+        }));
+      }
+    } catch (error) {
+      console.log("error.imageHander", error.message);
+    }
+  };
+
+  const uploadAvatarToServer = async () => {
+    try {
+      const storage = getStorage();
+      const uniquePostId = Date.now().toString();
+      const storageRef = ref(storage, `avatarImage/${uniquePostId}`);
+
+      const response = await fetch(state.avatarImage);
+      const file = await response.blob();
+
+      const uploadPhoto = await uploadBytes(storageRef, file).then(() => {});
+
+      const photoUri = await getDownloadURL(
+        ref(storage, `avatarImage/${uniquePostId}`)
+      )
+        .then((url) => {
+          return url;
+        })
+        .catch((error) => {
+          console.log(`error.photoUri`, error);
+        });
+      return photoUri;
+    } catch (error) {
+      console.log(`uploadAvatarToServer.error`, error);
+    }
+  };
+  const submitForm = async () => {
+    try {
+      const imageRef = await uploadAvatarToServer();
+
+      setState((prevState) => ({ ...prevState, avatarImage: imageRef }));
+      const newUser = {
+        avatarImage: imageRef,
+        login: state.login,
+        email: state.email,
+        password: state.password,
+      };
+
+      // console.log(`newUser`, newUser);
+      dispatch(authSignUpUser(newUser));
+    } catch (error) {
+      console.log(`submitForm.error`, error);
+    }
   };
 
   const keyboardHide = () => {
     setKeyboardVisible(false);
     Keyboard.dismiss();
-    console.log(state);
-    setState(initialState);
   };
 
   const toglePass = () => {
@@ -89,17 +158,31 @@ export default function RegistrationScreen({ navigation }) {
               }}
             >
               <View style={styles.avatarThmb}>
-                <ImageBackground />
-                <TouchableOpacity
-                  activeOpacity={0.6}
-                  style={styles.avatarBtn}
-                  // onPress={keyboardHide}
-                >
-                  <Text style={styles.avatarTitle}>+</Text>
+                <TouchableOpacity activeOpacity={0.6} onPress={imageHander}>
+                  <ImageBackground
+                    source={
+                      !state.avatarImage ? avaLOgo : { uri: state.avatarImage }
+                    }
+                    style={{
+                      width: 120,
+                      height: 120,
+                      borderRadius: 16,
+                    }}
+                    imageStyle={{ borderRadius: 6 }}
+                  >
+                    <TouchableOpacity
+                      activeOpacity={0.6}
+                      style={styles.avatarBtn}
+                      onPress={imageHander}
+                    >
+                      <Text style={styles.avatarTitle}>+</Text>
+                    </TouchableOpacity>
+                  </ImageBackground>
                 </TouchableOpacity>
               </View>
+
               <View style={styles.header}>
-                <Text style={styles.headerTitle}>Регистрация</Text>
+                <Text style={styles.headerTitle}>Реєстрація</Text>
               </View>
               <View style={{ marginBottom: 16 }}>
                 <TextInput
@@ -115,7 +198,7 @@ export default function RegistrationScreen({ navigation }) {
               </View>
               <View style={{ marginBottom: 16 }}>
                 <TextInput
-                  placeholder="Адрес электронной почты"
+                  placeholder="Адреса электронної пошти"
                   value={state.email}
                   style={styles.input}
                   textAlign={"left"}
@@ -134,7 +217,7 @@ export default function RegistrationScreen({ navigation }) {
                 <View style={styles.showPassThmb}>
                   <TouchableOpacity activeOpacity={0.6} onPress={toglePass}>
                     <Text style={styles.showPass}>
-                      {!showPass ? "Показать" : "Скрыть"}
+                      {!showPass ? "Показати" : "Скрити"}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -157,13 +240,13 @@ export default function RegistrationScreen({ navigation }) {
                     style={styles.btn}
                     onPress={() => submitForm()}
                   >
-                    <Text style={styles.btnTitle}>Зарегистрироваться</Text>
+                    <Text style={styles.btnTitle}>Зареєструватися</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     activeOpacity={0.6}
                     onPress={() => navigation.navigate({ name: "Login" })}
                   >
-                    <Text style={styles.regTitle}>Уже есть аккаунт? Войти</Text>
+                    <Text style={styles.regTitle}>Є аккаунт? Вхід</Text>
                   </TouchableOpacity>
                 </>
               )}
